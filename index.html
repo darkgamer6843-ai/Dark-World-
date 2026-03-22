@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CineMax Pro | Dark World</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e1b4b">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --accent: #6366f1; --glass: rgba(255, 255, 255, 0.05); }
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #020617);
+            color: white; font-family: 'Inter', sans-serif; margin: 0;
+            overflow-x: hidden; background-attachment: fixed;
+        }
+        .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .active-tab { background: var(--accent) !important; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); border: none !important; }
+        .skeleton { background: linear-gradient(90deg, #1e1b4b 25%, #2d2a6e 50%, #1e1b4b 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        
+        .loader-spin { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: var(--accent); padding: 12px 24px; border-radius: 20px; font-size: 10px; font-weight: 800; z-index: 5000; display: none; text-transform: uppercase; }
+        .no-scroll { overflow: hidden !important; position: fixed; width: 100%; }
+        .episode-card.active { border-color: var(--accent); background: rgba(99, 102, 241, 0.2); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        select { -webkit-appearance: none; appearance: none; }
+    </style>
+</head>
+<body class="pb-32">
+
+    <div id="toast">सूचना</div>
+
+    <header class="fixed top-0 w-full z-[100] px-6 py-4 glass border-none rounded-b-[35px]">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"><i class="fas fa-play text-white text-sm"></i></div>
+                <h1 class="text-xl font-black tracking-tighter uppercase italic">Cine<span class="text-indigo-400">Max</span> Pro</h1>
+            </div>
+            <button onclick="toggleSearch()" class="w-10 h-10 rounded-full glass flex items-center justify-center">
+                <i class="fas fa-search text-gray-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="mt-28 px-6">
+        <div id="search-box" class="hidden mb-6">
+            <input type="text" id="search-input" oninput="debouncedSearch(this.value)" placeholder="फ़िल्में, शो या एनीमे खोजें..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div id="continue-section" class="hidden mb-10">
+            <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-4 italic">देखना जारी रखें</h3>
+            <div id="continue-container" class="flex gap-4 overflow-x-auto no-scrollbar pb-2"></div>
+        </div>
+
+        <div id="filter-bar" class="flex gap-3 overflow-x-auto no-scrollbar mb-8">
+            <button id="tab-trending" onclick="fetchData('trending', this)" class="filter-btn px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap active-tab">ट्रेंडिंग</button>
+            <button onclick="fetchData('anime', this)" class="filter-btn px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">एनीमे</button>
+            <button onclick="fetchGenre(28, this)" class="filter-btn px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">एक्शन</button>
+            <button onclick="fetchGenre(35, this)" class="filter-btn px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">कॉमेडी</button>
+            <button onclick="fetchGenre(27, this)" class="filter-btn px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">हॉरर</button>
+        </div>
+
+        <h3 id="grid-title" class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-6 italic">विशेष सामग्री</h3>
+        
+        <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-[1001] hidden bg-black/95 backdrop-blur-3xl overflow-y-auto">
+        <div class="min-h-screen flex flex-col">
+            <div class="relative w-full aspect-[9/10] md:aspect-video">
+                <img id="d-poster" src="" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                <button onclick="history.back()" class="absolute top-8 left-6 w-12 h-12 rounded-full glass flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-8 -mt-24 relative z-10 flex-grow bg-gradient-to-b from-transparent to-[#020617]">
+                <div id="d-badges" class="flex flex-wrap items-center gap-2 mb-4"></div>
+                <h2 id="d-title" class="text-3xl font-black uppercase mb-4 tracking-tighter">शीर्षक</h2>
+                <p id="d-desc" class="text-sm text-gray-400 leading-relaxed mb-8">विवरण...</p>
+                
+                <div id="season-selector" class="hidden mb-6">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-3">सीजन चुनें</h4>
+                    <div class="relative">
+                        <select id="season-dropdown" onchange="changeSeason(this.value)" class="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-5 text-[11px] font-black uppercase focus:outline-none focus:border-indigo-500 glass text-white">
+                        </select>
+                        <i class="fas fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <div id="episode-selector" class="hidden mb-8">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-3">एपिसोड्स</h4>
+                    <div id="ep-list" class="flex gap-3 overflow-x-auto no-scrollbar pb-2"></div>
+                </div>
+
+                <div class="flex gap-4 sticky bottom-8">
+                    <button id="play-btn" class="flex-grow bg-white text-black py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition">
+                        <i class="fas fa-play"></i> अभी देखें
+                    </button>
+                    <button id="fav-btn" class="w-16 h-16 rounded-2xl glass flex items-center justify-center text-xl text-pink-500">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-modal" class="fixed inset-0 z-[2000] hidden bg-black flex flex-col">
+        <div class="p-6 flex items-center justify-between glass border-none">
+            <button onclick="history.back()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-white"><i class="fas fa-chevron-left"></i></button>
+            <div class="text-center truncate px-4">
+                <h4 id="p-name" class="text-[10px] font-black uppercase tracking-widest">स्ट्रीमिंग</h4>
+                <p id="p-sub" class="text-[8px] text-gray-500 uppercase font-bold">एपिसोड</p>
+            </div>
+            <div class="w-10"></div>
+        </div>
+        <div class="flex-grow flex items-center justify-center relative">
+            <div id="player-loader" class="absolute z-10 hidden flex flex-col items-center">
+                <div class="loader-spin"></div>
+                <p class="mt-4 text-[8px] font-black uppercase tracking-widest text-gray-500">लोड हो रहा है...</p>
+            </div>
+            <iframe id="v-frame" src="" class="w-full h-full md:w-3/4 md:h-3/4 md:rounded-[40px] shadow-2xl" allowfullscreen onload="hidePlayerLoader()"></iframe>
+        </div>
+        <div class="p-6 glass border-none flex gap-4">
+            <button onclick="switchServer(1)" class="flex-1 py-4 rounded-xl bg-indigo-600 text-[10px] font-bold uppercase italic text-white">सर्वर 1</button>
+            <button onclick="switchServer(2)" class="flex-1 py-4 rounded-xl glass text-[10px] font-bold uppercase italic text-white">सर्वर 2</button>
+        </div>
+    </div>
+
+    <nav class="fixed bottom-8 left-8 right-8 h-20 glass rounded-[35px] flex justify-around items-center px-4 z-[99] shadow-2xl border-white/10">
+        <div onclick="location.reload()" class="flex flex-col items-center gap-1 text-indigo-500 cursor-pointer"><i class="fas fa-home text-xl"></i><span class="text-[7px] font-black uppercase">मुख्य</span></div>
+        <div onclick="showWatchlist()" class="flex flex-col items-center gap-1 text-gray-500 cursor-pointer"><i class="fas fa-heart text-xl"></i><span class="text-[7px] font-black uppercase">सहेजें</span></div>
+        <div onclick="fetchData('anime')" class="flex flex-col items-center gap-1 text-gray-500 cursor-pointer"><i class="fas fa-fire text-xl"></i><span class="text-[7px] font-black uppercase">रुझान</span></div>
+    </nav>
+
+    <script>
+        const API_KEY = '58ecb62e3501a9362b07436c507aafd8';
+        const IMG = 'https://image.tmdb.org/t/p/w500';
+        let currentItem = null;
+        let watchlist = JSON.parse(localStorage.getItem('cine_watchlist')) || [];
+        let continueWatching = JSON.parse(localStorage.getItem('cine_continue')) || null;
+        let currentEp = 1;
+        let currentSeason = 1;
+        let searchTimer;
+
+        window.onpopstate = function() {
+            if (!document.getElementById('player-modal').classList.contains('hidden')) realClosePlayer();
+            else if (!document.getElementById('detail-modal').classList.contains('hidden')) realCloseDetail();
+        };
+
+        window.onload = () => { fetchData('trending'); renderContinueWatching(); };
+
+        function showSkeleton() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = Array(10).fill(0).map(() => `
+                <div class="rounded-[30px] p-2 glass">
+                    <div class="aspect-[2/3] rounded-[22px] skeleton"></div>
+                </div>
+            `).join('');
+        }
+
+        function renderContinueWatching() {
+            const section = document.getElementById('continue-section');
+            const container = document.getElementById('continue-container');
+            if(!continueWatching) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            container.innerHTML = `
+                <div onclick='showDetail(${JSON.stringify(continueWatching.item)})' class="min-w-[280px] h-32 glass rounded-[25px] flex items-center p-3 gap-4 cursor-pointer relative overflow-hidden group">
+                    <img src="${IMG + continueWatching.item.backdrop_path}" class="w-24 h-full object-cover rounded-xl opacity-60 group-hover:opacity-100 transition">
+                    <div class="flex-grow">
+                        <h4 class="text-[9px] font-black uppercase truncate w-32 text-white">${continueWatching.item.title || continueWatching.item.name}</h4>
+                        <p class="text-[7px] font-bold text-indigo-400 mt-1 uppercase italic">${continueWatching.type === 'tv' ? 'S' + continueWatching.season + ' • E' + continueWatching.episode : 'फिर से देखें'}</p>
+                        <div class="w-full h-1 bg-white/10 rounded-full mt-3 overflow-hidden"><div class="w-3/4 h-full bg-indigo-500"></div></div>
+                    </div>
+                    <i class="fas fa-play-circle absolute right-4 text-2xl text-white/20 group-hover:text-white transition"></i>
+                </div>
+            `;
+        }
+
+        async function fetchData(mode, btn) {
+            updateActiveTab(btn); showSkeleton();
+            let url = `https://api.themoviedb.org/3/trending/all/day?api_key=${API_KEY}`;
+            if(mode === 'anime') url = `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&with_genres=16&sort_by=popularity.desc`;
+            const res = await fetch(url);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = mode.toUpperCase();
+        }
+
+        async function fetchGenre(id, btn) {
+            updateActiveTab(btn); showSkeleton();
+            const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_genres=${id}&sort_by=popularity.desc`);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = 'खोजें';
+        }
+
+        function renderGrid(items) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            items.forEach(m => {
+                if(!m.poster_path) return;
+                const div = document.createElement('div');
+                div.className = "movie-card glass rounded-[30px] p-2 cursor-pointer";
+                div.onclick = () => showDetail(m);
+                div.innerHTML = `
+                    <div class="aspect-[2/3] rounded-[22px] overflow-hidden mb-3 relative">
+                        <img src="${IMG + m.poster_path}" class="w-full h-full object-cover" loading="lazy">
+                        <div class="absolute top-3 left-3 px-2 py-1 glass rounded-lg text-[6px] font-black uppercase text-white">
+                            ${m.media_type === 'tv' || !m.title ? 'TV' : 'Movie'}
+                        </div>
+                    </div>
+                    <h4 class="text-[9px] font-black truncate uppercase text-center px-2 text-white">${m.title || m.name}</h4>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function debouncedSearch(query) {
+            clearTimeout(searchTimer);
+            if(!query) { 
+                document.getElementById('continue-section').classList.remove('hidden');
+                document.getElementById('filter-bar').classList.remove('hidden');
+                fetchData('trending'); 
+                return; 
+            }
+            searchTimer = setTimeout(async () => {
+                document.getElementById('continue-section').classList.add('hidden');
+                document.getElementById('filter-bar').classList.add('hidden');
+                showSkeleton();
+                const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${query}`);
+                const data = await res.json();
+                renderGrid(data.results);
+                document.getElementById('grid-title').innerText = 'खोज परिणाम';
+            }, 500);
+        }
+
+        async function showDetail(m) {
+            currentItem = m;
+            const type = m.media_type || (m.title ? 'movie' : 'tv');
+            currentEp = (continueWatching && continueWatching.item.id === m.id) ? continueWatching.episode : 1;
+            currentSeason = (continueWatching && continueWatching.item.id === m.id) ? (continueWatching.season || 1) : 1;
+
+            history.pushState({modal: "detail"}, "");
+            document.getElementById('d-title').innerText = m.title || m.name;
+            document.getElementById('d-desc').innerText = m.overview || "विवरण उपलब्ध नहीं है।";
+            document.getElementById('d-poster').src = IMG + (m.backdrop_path || m.poster_path);
+            
+            const badgeContainer = document.getElementById('d-badges');
+            badgeContainer.innerHTML = '';
+            if(m.vote_average >= 8) badgeContainer.innerHTML += `<span class="bg-indigo-600 text-white text-[8px] font-black px-3 py-1 rounded-lg uppercase">टॉप रेटेड</span>`;
+            if(m.vote_average > 0) badgeContainer.innerHTML += `<span class="bg-yellow-500 text-black text-[8px] font-black px-3 py-1 rounded-lg uppercase">⭐ ${m.vote_average.toFixed(1)}</span>`;
+
+            if(type === 'tv') {
+                document.getElementById('episode-selector').classList.remove('hidden');
+                document.getElementById('season-selector').classList.remove('hidden');
+                await loadSeasons(m.id);
+            } else {
+                document.getElementById('episode-selector').classList.add('hidden');
+                document.getElementById('season-selector').classList.add('hidden');
+            }
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+            document.body.classList.add('no-scroll');
+            document.getElementById('play-btn').onclick = () => openPlayer(m.id, type, m.title || m.name, currentEp, currentSeason);
+            updateFavBtnUI(m.id);
+            document.getElementById('fav-btn').onclick = () => toggleWatchlist(m);
+        }
+
+        async function loadSeasons(id) {
+            const dropdown = document.getElementById('season-dropdown');
+            const res = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${API_KEY}`);
+            const data = await res.json();
+            dropdown.innerHTML = '';
+            data.seasons.forEach(s => {
+                if(s.season_number === 0) return;
+                const opt = document.createElement('option');
+                opt.value = s.season_number;
+                opt.className = "bg-[#020617]";
+                opt.innerText = `सीजन ${s.season_number} (${s.episode_count} एपिसोड्स)`;
+                if(s.season_number === currentSeason) opt.selected = true;
+                dropdown.appendChild(opt);
+            });
+            loadEpisodes(id, currentSeason);
+        }
+
+        async function changeSeason(seaNum) {
+            currentSeason = parseInt(seaNum);
+            currentEp = 1;
+            loadEpisodes(currentItem.id, currentSeason);
+        }
+
+        async function loadEpisodes(id, seasonNum) {
+            const list = document.getElementById('ep-list');
+            list.innerHTML = `<div class="skeleton w-14 h-14 rounded-xl"></div>`.repeat(6);
+            const res = await fetch(`https://api.themoviedb.org/3/tv/${id}/season/${seasonNum}?api_key=${API_KEY}`);
+            const data = await res.json();
+            list.innerHTML = '';
+            data.episodes.forEach(ep => {
+                const div = document.createElement('div');
+                const isActive = ep.episode_number === currentEp;
+                div.className = `min-w-[56px] h-[56px] glass rounded-xl flex items-center justify-center text-[10px] font-black episode-card cursor-pointer transition text-white ${isActive?'active':''}`;
+                div.innerText = `E${ep.episode_number}`;
+                div.onclick = () => {
+                    document.querySelectorAll('.episode-card').forEach(el => el.classList.remove('active'));
+                    div.classList.add('active');
+                    currentEp = ep.episode_number;
+                    document.getElementById('play-btn').onclick = () => openPlayer(id, 'tv', currentItem.name, currentEp, seasonNum);
+                };
+                list.appendChild(div);
+            });
+        }
+
+        function openPlayer(id, type, name, ep, sea = 1) {
+            history.pushState({modal: "player"}, "");
+            continueWatching = { item: currentItem, type, episode: ep, season: sea, timestamp: Date.now() };
+            localStorage.setItem('cine_continue', JSON.stringify(continueWatching));
+            renderContinueWatching();
+
+            document.getElementById('p-name').innerText = name;
+            document.getElementById('p-sub').innerText = type === 'tv' ? `S${sea} • E${ep}` : 'पूरी फिल्म';
+            document.getElementById('v-frame').src = type === 'tv' 
+                ? `https://vidsrc.to/embed/tv/${id}/${sea}/${ep}`
+                : `https://vidsrc.to/embed/movie/${id}`;
+            
+            document.getElementById('player-loader').classList.remove('hidden');
+            document.getElementById('player-modal').classList.remove('hidden');
+        }
+
+        function realClosePlayer() {
+            document.getElementById('player-modal').classList.add('hidden');
+            document.getElementById('v-frame').src = '';
+        }
+
+        function realCloseDetail() {
+            document.getElementById('detail-modal').classList.add('hidden');
+            document.body.classList.remove('no-scroll');
+        }
+
+        function switchServer(s) {
+            const type = continueWatching.type;
+            const id = continueWatching.item.id;
+            const sea = continueWatching.season;
+            const ep = continueWatching.episode;
+            document.getElementById('player-loader').classList.remove('hidden');
+            const base = s === 1 ? 'https://vidsrc.to/embed' : 'https://vidsrc.me/embed';
+            document.getElementById('v-frame').src = type === 'tv' ? `${base}/tv/${id}/${sea}/${ep}` : `${base}/movie/${id}`;
+        }
+
+        function hidePlayerLoader() { document.getElementById('player-loader').classList.add('hidden'); }
+        function toggleSearch() { 
+            const box = document.getElementById('search-box'); 
+            box.classList.toggle('hidden'); 
+            if(!box.classList.contains('hidden')) document.getElementById('search-input').focus();
+        }
+        function updateFavBtnUI(id) { document.getElementById('fav-btn').innerHTML = watchlist.some(i => i.id === id) ? '<i class="fas fa-heart"></i>' : '<i class="far fa-heart"></i>'; }
+        function toggleWatchlist(m) {
+            const idx = watchlist.findIndex(i => i.id === m.id);
+            if(idx === -1) { watchlist.push(m); showToast("सहेजा गया ❤️"); } 
+            else { watchlist.splice(idx, 1); showToast("हटाया गया 💔"); }
+            localStorage.setItem('cine_watchlist', JSON.stringify(watchlist));
+            updateFavBtnUI(m.id);
+        }
+        function showWatchlist() { renderGrid(watchlist); document.getElementById('grid-title').innerText = 'मेरी सूची'; }
+        function updateActiveTab(btn) { if(!btn) return; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active-tab')); btn.classList.add('active-tab'); }
+        function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+    </script>
+</body>
+</html>
