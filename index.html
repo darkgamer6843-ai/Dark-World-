@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CineMax Pro | Hindi Dark World</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e1b4b">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --accent: #6366f1; --glass: rgba(255, 255, 255, 0.05); }
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #020617);
+            color: white; font-family: 'Inter', sans-serif; margin: 0;
+            overflow-x: hidden; background-attachment: fixed; user-select: none;
+        }
+        .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .active-tab { background: var(--accent) !important; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); border: none !important; }
+        .movie-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .movie-card:active { transform: scale(0.95); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .premium-badge { background: linear-gradient(90deg, #6366f1, #a855f7); color: white; font-weight: 900; font-size: 7px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+        
+        .skeleton { background: linear-gradient(90deg, #1e1b4b 25%, #2d2a6e 50%, #1e1b4b 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        #toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(99, 102, 241, 0.95); padding: 12px 24px; border-radius: 20px; font-size: 10px; font-weight: 800; z-index: 2000; display: none; text-transform: uppercase; }
+        
+        .modal-enter { animation: modalIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes modalIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="pb-32">
+
+    <div id="toast">Message</div>
+
+    <header class="fixed top-0 w-full z-50 px-6 py-4 glass border-none rounded-b-[35px]">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"><i class="fas fa-play text-white text-sm"></i></div>
+                <h1 class="text-xl font-black tracking-tighter uppercase italic">Cine<span class="text-indigo-400">Max</span> Pro</h1>
+            </div>
+            <button onclick="toggleSearch()" class="w-10 h-10 rounded-full glass flex items-center justify-center">
+                <i class="fas fa-search text-gray-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="mt-28 px-6">
+        <div id="search-box" class="hidden mb-6">
+            <input type="text" id="search-input" onkeyup="handleSearch(event)" placeholder="Search Hindi Movies or Anime..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div class="flex gap-3 overflow-x-auto no-scrollbar mb-8">
+            <button onclick="fetchData('trending', this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap active-tab">Trending</button>
+            <button onclick="fetchData('anime', this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Anime</button>
+            <button onclick="fetchGenre(28, this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Action</button>
+            <button onclick="fetchGenre(35, this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Comedy</button>
+            <button onclick="fetchGenre(27, this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Horror</button>
+        </div>
+
+        <h3 id="grid-title" class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-6 italic">Featured Content</h3>
+        <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6"></div>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-[1001] hidden bg-black/95 backdrop-blur-2xl overflow-y-auto">
+        <div class="min-h-screen flex flex-col modal-enter">
+            <div class="relative w-full aspect-[9/12] sm:aspect-video">
+                <img id="d-poster" src="" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                <button onclick="closeDetail()" class="absolute top-8 left-6 w-12 h-12 rounded-full glass flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-8 -mt-20 relative z-10 flex-grow bg-gradient-to-b from-transparent to-[#020617]">
+                <div class="flex items-center gap-3 mb-4">
+                    <span id="d-rating" class="bg-yellow-500 text-black text-[10px] font-black px-3 py-1 rounded-lg">⭐ 8.5</span>
+                    <span id="d-date" class="text-[10px] font-bold text-gray-400">2024</span>
+                    <span class="premium-badge italic">Hindi Dubbed Available</span>
+                </div>
+                <h2 id="d-title" class="text-3xl font-black uppercase mb-4 tracking-tighter italic">Movie Name</h2>
+                <p id="d-desc" class="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-5">Loading description...</p>
+                
+                <div class="flex gap-4 sticky bottom-8">
+                    <button id="play-btn" class="flex-1 bg-white text-black py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition">
+                        <i class="fas fa-play text-indigo-600"></i> Watch Now
+                    </button>
+                    <button id="fav-btn" class="w-16 h-16 rounded-2xl glass flex items-center justify-center text-xl text-pink-500 active:scale-90 transition">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-modal" class="fixed inset-0 z-[2000] hidden bg-black flex flex-col">
+        <div class="p-6 flex items-center justify-between glass border-none">
+            <button onclick="closePlayer()" class="w-10 h-10 rounded-xl glass flex items-center justify-center"><i class="fas fa-chevron-left text-indigo-400"></i></button>
+            <h4 id="p-name" class="text-[10px] font-black uppercase tracking-widest truncate w-40 text-center italic text-indigo-400">Streaming Mode</h4>
+            <button onclick="refreshStream()" class="w-10 h-10 rounded-xl glass flex items-center justify-center"><i class="fas fa-sync-alt text-gray-400 text-xs"></i></button>
+        </div>
+        <div class="flex-grow flex items-center justify-center bg-black">
+            <iframe id="v-frame" src="" class="w-full h-full" allowfullscreen></iframe>
+        </div>
+        <div class="p-6 glass border-none flex gap-4">
+            <button onclick="switchServer(1)" class="flex-1 py-4 rounded-xl bg-indigo-600 text-[10px] font-bold uppercase italic shadow-lg shadow-indigo-500/20">
+                <i class="fas fa-bolt mr-2 text-[8px]"></i> High Speed
+            </button>
+            <button onclick="switchServer(2)" class="flex-1 py-4 rounded-xl glass text-[10px] font-bold uppercase italic font-black border-white/20 text-gray-300">
+                <i class="fas fa-language mr-2 text-[8px]"></i> Multi-Audio
+            </button>
+        </div>
+    </div>
+
+    <nav class="fixed bottom-8 left-8 right-8 h-20 glass rounded-[35px] flex justify-around items-center px-4 z-50 shadow-2xl">
+        <div onclick="location.reload()" class="flex flex-col items-center gap-1 text-indigo-500 cursor-pointer"><i class="fas fa-home text-xl"></i><span class="text-[7px] font-black uppercase tracking-tighter">Home</span></div>
+        <div onclick="showWatchlist()" class="flex flex-col items-center gap-1 text-gray-500 cursor-pointer"><i class="fas fa-heart text-xl"></i><span class="text-[7px] font-black uppercase tracking-tighter">Watchlist</span></div>
+        <div onclick="fetchData('anime')" class="flex flex-col items-center gap-1 text-gray-500 cursor-pointer"><i class="fas fa-fire text-xl"></i><span class="text-[7px] font-black uppercase tracking-tighter">Anime</span></div>
+    </nav>
+
+    <script>
+        const API_KEY = '58ecb62e3501a9362b07436c507aafd8';
+        const IMG = 'https://image.tmdb.org/t/p/w500';
+        let currentItem = null;
+        let watchlist = JSON.parse(localStorage.getItem('cine_watchlist')) || [];
+        let autoSwitchTimer; // ऑटो-स्विच के लिए टाइमर वेरिएबल
+
+        window.onload = () => {
+            fetchData('trending');
+            registerSW();
+        };
+
+        async function registerSW() {
+            if ('serviceWorker' in navigator) {
+                try { await navigator.serviceWorker.register('./sw.js'); console.log('SW Ready'); }
+                catch (e) { console.log('SW Failed'); }
+            }
+        }
+
+        function showSkeleton() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = Array(8).fill(0).map(() => `
+                <div class="rounded-[30px] p-2 glass">
+                    <div class="aspect-[2/3] rounded-[22px] skeleton"></div>
+                    <div class="h-3 w-2/3 skeleton mt-4 rounded-full mx-auto"></div>
+                </div>
+            `).join('');
+        }
+
+        async function fetchData(mode, btn) {
+            updateActiveTab(btn);
+            showSkeleton();
+            let url = `https://api.themoviedb.org/3/trending/all/day?api_key=${API_KEY}&language=hi-IN&region=IN`;
+            if(mode === 'anime') url = `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&with_genres=16&sort_by=popularity.desc&language=hi-IN`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = mode.toUpperCase();
+        }
+
+        async function fetchGenre(id, btn) {
+            updateActiveTab(btn);
+            showSkeleton();
+            const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_genres=${id}&sort_by=popularity.desc&language=hi-IN`);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = 'Explore Genre';
+        }
+
+        function renderGrid(items) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = items.filter(m => m.poster_path).map(m => `
+                <div class="movie-card glass rounded-[30px] p-2" onclick='showDetail(${JSON.stringify(m).replace(/'/g, "&apos;")})'>
+                    <div class="aspect-[2/3] rounded-[22px] overflow-hidden shadow-lg mb-3">
+                        <img src="${IMG + m.poster_path}" class="w-full h-full object-cover" loading="lazy">
+                    </div>
+                    <h4 class="text-[9px] font-black truncate uppercase text-center px-2 italic text-gray-200">${m.title || m.name}</h4>
+                </div>
+            `).join('');
+        }
+
+        function showDetail(m) {
+            currentItem = m;
+            document.getElementById('d-title').innerText = m.title || m.name;
+            document.getElementById('d-desc').innerText = m.overview || "Optimizing Hindi stream... Please wait.";
+            document.getElementById('d-rating').innerText = `⭐ ${m.vote_average ? m.vote_average.toFixed(1) : 'N/A'}`;
+            document.getElementById('d-date').innerText = (m.release_date || m.first_air_date || "2024").split('-')[0];
+            document.getElementById('d-poster').src = IMG + (m.backdrop_path || m.poster_path);
+            
+            document.getElementById('detail-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            const type = (m.title || m.media_type === 'movie') ? 'movie' : 'tv';
+            document.getElementById('play-btn').onclick = () => openPlayer(m.id, type, m.title || m.name);
+            updateFavBtnUI(m.id);
+            document.getElementById('fav-btn').onclick = () => toggleWatchlist(m);
+        }
+
+        // --- UPDATED OPEN PLAYER WITH SMART SWITCH ---
+        function openPlayer(id, type, name) {
+            document.getElementById('p-name').innerText = name;
+            const frame = document.getElementById('v-frame');
+            
+            // पहले सर्वर 1 लोड करें
+            frame.src = `https://vidsrc.to/embed/${type}/${id}`;
+            document.getElementById('player-modal').classList.remove('hidden');
+            document.getElementById('detail-modal').classList.add('hidden');
+            showToast("Connecting to High Speed Server...");
+
+            // SMART AUTO-SWITCH LOGIC: अगर 7 सेकंड तक सर्वर 1 नहीं चला, तो खुद स्विच करें
+            clearTimeout(autoSwitchTimer);
+            autoSwitchTimer = setTimeout(() => {
+                if (frame.src.includes("vidsrc.to")) {
+                    showToast("Server 1 Busy. Auto-switching to Multi-Audio...");
+                    switchServer(2);
+                }
+            }, 7500);
+        }
+
+        function switchServer(s) {
+            const type = (currentItem.title || currentItem.media_type === 'movie') ? 'movie' : 'tv';
+            const id = currentItem.id;
+            const frame = document.getElementById('v-frame');
+            
+            clearTimeout(autoSwitchTimer); // मैनुअल स्विच करने पर ऑटो-टाइमर हटा दें
+
+            if(s === 1) {
+                frame.src = `https://vidsrc.to/embed/${type}/${id}`;
+                showToast("Switching to High Speed...");
+            } else {
+                frame.src = `https://vidsrc.me/embed/${type}?tmdb=${id}`;
+                showToast("Switching to Multi-Audio/Hindi...");
+            }
+        }
+
+        function refreshStream() {
+            const frame = document.getElementById('v-frame');
+            const currentSrc = frame.src;
+            frame.src = '';
+            setTimeout(() => {
+                frame.src = currentSrc;
+                showToast("Refreshing Connection...");
+            }, 100);
+        }
+
+        function closePlayer() {
+            clearTimeout(autoSwitchTimer);
+            document.getElementById('player-modal').classList.add('hidden');
+            document.getElementById('v-frame').src = '';
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        async function handleSearch(e) {
+            if(e.key === 'Enter') {
+                const q = e.target.value;
+                if(!q) return;
+                showSkeleton();
+                const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${q}&language=hi-IN`);
+                const data = await res.json();
+                renderGrid(data.results);
+                document.getElementById('grid-title').innerText = 'Results for: ' + q;
+            }
+        }
+
+        function updateActiveTab(btn) {
+            if(!btn) return;
+            document.querySelectorAll('button').forEach(b => b.classList.remove('active-tab'));
+            btn.classList.add('active-tab');
+        }
+
+        function toggleSearch() {
+            const box = document.getElementById('search-box');
+            box.classList.toggle('hidden');
+            if(!box.classList.contains('hidden')) document.getElementById('search-input').focus();
+        }
+
+        function toggleWatchlist(m) {
+            const idx = watchlist.findIndex(i => i.id === m.id);
+            if(idx === -1) { watchlist.push(m); showToast("Added to Watchlist ❤️"); }
+            else { watchlist.splice(idx, 1); showToast("Removed from List 💔"); }
+            localStorage.setItem('cine_watchlist', JSON.stringify(watchlist));
+            updateFavBtnUI(m.id);
+        }
+
+        function updateFavBtnUI(id) {
+            const inWatchlist = watchlist.some(i => i.id === id);
+            document.getElementById('fav-btn').innerHTML = inWatchlist ? '<i class="fas fa-heart"></i>' : '<i class="far fa-heart"></i>';
+        }
+
+        function showWatchlist() {
+            renderGrid(watchlist);
+            document.getElementById('grid-title').innerText = 'My Favorites';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2000);
+        }
+
+        function closeDetail() { 
+            document.getElementById('detail-modal').classList.add('hidden'); 
+            document.body.style.overflow = 'auto'; 
+        }
+    </script>
+</body>
+</html>
