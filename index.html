@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMax Pro | Dark World</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #020617; color: white; scroll-behavior: smooth; font-family: sans-serif; }
+        .movie-card:hover { transform: scale(1.05); transition: 0.3s; cursor: pointer; }
+        .glass { background: rgba(30, 27, 75, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        #videoPlayerContainer { display: none; position: fixed; inset: 0; z-index: 100; background: black; }
+        iframe { border: none; width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="videoPlayerContainer">
+        <div class="absolute top-4 left-4 z-50 flex items-center gap-3">
+            <button onclick="closePlayer()" class="bg-indigo-600 px-4 py-2 rounded-full font-bold shadow-lg">
+                <i class="fas fa-arrow-left mr-2"></i> वापस जाएँ
+            </button>
+        </div>
+        <iframe id="videoFrame" allowfullscreen></iframe>
+    </div>
+
+    <nav class="p-5 glass sticky top-0 z-50 flex justify-between items-center shadow-2xl">
+        <div class="flex items-center gap-2">
+            <div class="bg-indigo-600 p-2 rounded-lg"><i class="fas fa-play text-white"></i></div>
+            <h1 class="text-2xl font-black italic text-indigo-400 tracking-tighter">CINEMAX PRO</h1>
+        </div>
+        <i class="fas fa-search text-xl text-gray-400"></i>
+    </nav>
+
+    <main class="p-4 mb-24">
+        <h2 class="text-white font-bold text-xl mb-6 flex items-center gap-2">
+            <span class="w-1.5 h-6 bg-indigo-500 rounded-full"></span> आज का ट्रेंडिंग
+        </h2>
+        <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            </div>
+    </main>
+
+    <div class="fixed bottom-0 w-full glass p-4 flex justify-around items-center z-40 border-t border-white/10">
+        <div class="text-indigo-400 flex flex-col items-center"><i class="fas fa-home text-xl"></i><span class="text-[10px] mt-1 font-bold uppercase">होम</span></div>
+        <div class="text-gray-400 flex flex-col items-center"><i class="fas fa-fire text-xl"></i><span class="text-[10px] mt-1 font-bold uppercase">ट्रेंडिंग</span></div>
+        <div class="text-gray-400 flex flex-col items-center"><i class="fas fa-download text-xl"></i><span class="text-[10px] mt-1 font-bold uppercase">डाउनलोड</span></div>
+    </div>
+
+    <script>
+        const API_KEY = '58ecb62e3501a9362b07436c507aafd8'; 
+        const movieGrid = document.getElementById('movieGrid');
+        const videoPlayerContainer = document.getElementById('videoPlayerContainer');
+        const videoFrame = document.getElementById('videoFrame');
+
+        async function fetchMovies() {
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/trending/all/day?api_key=${API_KEY}`);
+                const data = await res.json();
+                movieGrid.innerHTML = data.results.map(m => `
+                    <div class="movie-card bg-slate-900 rounded-2xl overflow-hidden border border-white/5 shadow-xl" 
+                         onclick="playMovie('${m.media_type}', '${m.id}')">
+                        <img src="https://image.tmdb.org/t/p/w500${m.poster_path}" class="w-full h-72 object-cover">
+                        <div class="p-3">
+                            <h3 class="text-sm font-bold truncate text-gray-100">${m.title || m.name}</h3>
+                            <p class="text-[10px] text-indigo-400 mt-1 font-bold uppercase tracking-widest italic">
+                                ${m.media_type === 'movie' ? 'फिल्म' : 'सीरीज'} • ⭐ ${m.vote_average.toFixed(1)}
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { movieGrid.innerHTML = "Error loading movies."; }
+        }
+
+        function playMovie(type, id) {
+            // हमने vidsrc.to का उपयोग किया है जिसमें डाउनलोड बटन भी होता है
+            const streamUrl = type === 'movie' 
+                ? `https://vidsrc.to/embed/movie/${id}` 
+                : `https://vidsrc.to/embed/tv/${id}/1/1`;
+            
+            videoFrame.src = streamUrl;
+            videoPlayerContainer.style.display = 'block';
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closePlayer() {
+            videoPlayerContainer.style.display = 'none';
+            videoFrame.src = '';
+            document.body.style.overflow = 'auto';
+        }
+
+        fetchMovies();
+    </script>
+</body>
+</html>
