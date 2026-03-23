@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DARK WORLD | Streaming App</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --accent: #6366f1; --glass: rgba(255, 255, 255, 0.05); }
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #020617);
+            color: white; font-family: 'Inter', sans-serif; margin: 0;
+            overflow-x: hidden; background-attachment: fixed; user-select: none;
+        }
+        .glass { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .active-tab { background: var(--accent) !important; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); border: none !important; }
+        .movie-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .movie-card:active { transform: scale(0.95); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        #toast { position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(99, 102, 241, 0.95); padding: 12px 24px; border-radius: 20px; font-size: 10px; font-weight: 800; z-index: 2000; display: none; text-transform: uppercase; text-align: center; width: 85%; max-width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        iframe { border-radius: 12px; }
+
+        @keyframes fadeZoom {
+            0% { opacity: 0; transform: scale(0.8); filter: blur(10px); }
+            100% { opacity: 1; transform: scale(1); filter: blur(0); }
+        }
+        .animate-splash { animation: fadeZoom 1.2s ease-out forwards; }
+    </style>
+</head>
+<body class="pb-32">
+
+    <div id="splash-screen" style="position: fixed; inset: 0; background: #020617; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease-in-out;">
+        <div class="text-center animate-splash">
+            <div class="w-24 h-24 bg-indigo-600 rounded-[30px] flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.5)] mx-auto mb-8">
+                <i class="fas fa-play text-white text-4xl"></i>
+            </div>
+            <h1 class="text-5xl font-black italic tracking-tighter uppercase">DARK <span class="text-indigo-500">WORLD</span></h1>
+            <p class="text-[10px] text-gray-500 tracking-[0.5em] uppercase mt-4 font-bold">Streaming Universe</p>
+        </div>
+    </div>
+
+    <div id="main-content" style="opacity: 0; transition: opacity 1s ease;">
+        <div id="toast">Message</div>
+
+        <header class="fixed top-0 w-full z-50 px-6 py-4 glass border-none rounded-b-[35px]">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg"><i class="fas fa-play text-white text-sm"></i></div>
+                    <h1 class="text-xl font-black tracking-tighter uppercase italic">DARK <span class="text-indigo-400">WORLD</span></h1>
+                </div>
+                <button onclick="toggleSearch()" class="w-10 h-10 rounded-full glass flex items-center justify-center">
+                    <i class="fas fa-search text-gray-300"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="mt-28 px-6">
+            <div id="search-box" class="hidden mb-6">
+                <input type="text" id="search-input" onkeyup="handleSearch(event)" placeholder="Search Movies or Anime..." class="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-sm focus:outline-none focus:border-indigo-500 text-white shadow-inner">
+            </div>
+
+            <div class="flex gap-3 overflow-x-auto no-scrollbar mb-8">
+                <button onclick="fetchData('trending', this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap active-tab">Trending</button>
+                <button onclick="fetchHindi(this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Hindi Dubbed</button>
+                <button onclick="fetchData('anime', this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Anime</button>
+                <button onclick="fetchGenre(28, this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Action</button>
+                <button onclick="fetchGenre(27, this)" class="px-6 py-3 rounded-xl glass text-[10px] font-black uppercase whitespace-nowrap">Horror</button>
+            </div>
+
+            <h3 id="grid-title" class="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 mb-6 italic">Featured Content</h3>
+            <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6"></div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="fixed inset-0 z-[1001] hidden bg-black/95 backdrop-blur-3xl overflow-y-auto">
+        <div class="min-h-screen flex flex-col">
+            <div class="relative w-full aspect-[9/12]">
+                <img id="d-poster" src="" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
+                <button onclick="closeDetail()" class="absolute top-8 left-6 w-12 h-12 rounded-full glass flex items-center justify-center text-white"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="p-8 -mt-24 relative z-10 bg-[#020617] rounded-t-[40px] flex-grow">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-600 text-[8px] font-black px-3 py-1 rounded-full uppercase italic">HD 4K</span>
+                    <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Hindi Available</span>
+                </div>
+                <h2 id="d-title" class="text-3xl font-black uppercase mb-4 italic tracking-tighter">Movie Name</h2>
+                <p id="d-desc" class="text-sm text-gray-400 mb-10 leading-relaxed line-clamp-6">Description...</p>
+                <div class="fixed bottom-10 left-8 right-8 z-20">
+                    <button id="play-btn" class="w-full bg-white text-black py-5 rounded-[22px] font-black uppercase shadow-2xl active:scale-95 transition flex items-center justify-center gap-3">
+                        <i class="fas fa-play text-indigo-600"></i> Watch Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-modal" class="fixed inset-0 z-[2000] hidden bg-black flex flex-col">
+        <div class="p-4 flex items-center justify-between glass border-none">
+            <button onclick="closePlayer()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-white"><i class="fas fa-chevron-left"></i></button>
+            <h4 id="p-name" class="text-[10px] font-black uppercase truncate text-indigo-400 italic text-center w-48">Now Playing</h4>
+            <button onclick="refreshStream()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-white"><i class="fas fa-sync-alt"></i></button>
+        </div>
+        <div class="flex-grow bg-black flex items-center justify-center">
+            <iframe id="v-frame" src="" class="w-full h-full" allowfullscreen scrolling="no"></iframe>
+        </div>
+        <div class="p-6 glass border-none flex gap-4">
+            <button onclick="switchServer(1)" class="flex-1 py-4 rounded-xl glass text-[10px] font-bold text-gray-400 uppercase italic">Server 1 (Fast)</button>
+            <button onclick="switchServer(2)" class="flex-1 py-4 rounded-xl bg-indigo-600 text-[10px] font-bold text-white uppercase italic shadow-lg">Server 2 (Hindi)</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '58ecb62e3501a9362b07436c507aafd8';
+        const IMG = 'https://image.tmdb.org/t/p/w500';
+        let currentItem = null;
+
+        window.onload = () => {
+            fetchData('trending');
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                document.getElementById('main-content').style.opacity = '1';
+                setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; }, 800);
+            }, 2500);
+        };
+
+        async function fetchData(mode, btn) {
+            if(btn) updateActiveTab(btn);
+            let url = `https://api.themoviedb.org/3/trending/all/day?api_key=${API_KEY}&language=hi-IN`;
+            if(mode === 'anime') url = `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&with_genres=16&language=hi-IN&sort_by=popularity.desc`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = mode.toUpperCase();
+        }
+
+        async function fetchHindi(btn) {
+            updateActiveTab(btn);
+            let url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_original_language=hi&sort_by=popularity.desc`;
+            const res = await fetch(url);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = 'HINDI DUBBED';
+        }
+
+        async function fetchGenre(id, btn) {
+            updateActiveTab(btn);
+            const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&with_genres=${id}&language=hi-IN`);
+            const data = await res.json();
+            renderGrid(data.results);
+            document.getElementById('grid-title').innerText = 'EXPLORE';
+        }
+
+        function renderGrid(items) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = items.filter(m => m.poster_path).map(m => `
+                <div class="movie-card glass rounded-[28px] p-2" onclick='showDetail(${JSON.stringify(m).replace(/'/g, "&apos;")})'>
+                    <div class="aspect-[2/3] rounded-[22px] overflow-hidden">
+                        <img src="${IMG + m.poster_path}" class="w-full h-full object-cover">
+                    </div>
+                    <h4 class="text-[9px] font-black truncate uppercase text-center mt-3 italic">${m.title || m.name}</h4>
+                </div>
+            `).join('');
+        }
+
+        function showDetail(m) {
+            currentItem = m;
+            document.getElementById('d-title').innerText = m.title || m.name;
+            document.getElementById('d-desc').innerText = m.overview || "Hindi Dubbed Stream available. Click Watch Now.";
+            document.getElementById('d-poster').src = IMG + (m.backdrop_path || m.poster_path);
+            document.getElementById('detail-modal').classList.remove('hidden');
+            const type = (m.title || m.media_type === 'movie') ? 'movie' : 'tv';
+            document.getElementById('play-btn').onclick = () => openPlayer(m.id, type, m.title || m.name);
+        }
+
+        function openPlayer(id, type, name) {
+            document.getElementById('p-name').innerText = name;
+            const frame = document.getElementById('v-frame');
+            frame.src = `https://vidsrc.me/embed/${type}?tmdb=${id}&lang=hi`; 
+            document.getElementById('player-modal').classList.remove('hidden');
+            document.getElementById('detail-modal').classList.add('hidden');
+            showToast("Searching Hindi Audio...");
+        }
+
+        function switchServer(s) {
+            const type = (currentItem.title || currentItem.media_type === 'movie') ? 'movie' : 'tv';
+            const id = currentItem.id;
+            const frame = document.getElementById('v-frame');
+            if(s === 1) frame.src = `https://vidsrc.to/embed/${type}/${id}`;
+            else frame.src = `https://vidsrc.me/embed/${type}?tmdb=${id}&lang=hi`;
+            showToast("Server Switched!");
+        }
+
+        function closePlayer() {
+            document.getElementById('player-modal').classList.add('hidden');
+            document.getElementById('v-frame').src = '';
+        }
+
+        function closeDetail() { document.getElementById('detail-modal').classList.add('hidden'); }
+        
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        function updateActiveTab(btn) {
+            document.querySelectorAll('button').forEach(b => b.classList.remove('active-tab'));
+            if(btn) btn.classList.add('active-tab');
+        }
+
+        function toggleSearch() { 
+            const box = document.getElementById('search-box');
+            box.classList.toggle('hidden');
+            if(!box.classList.contains('hidden')) document.getElementById('search-input').focus();
+        }
+
+        async function handleSearch(e) {
+            if(e.key === 'Enter') {
+                const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${e.target.value}&language=hi-IN`);
+                const data = await res.json();
+                renderGrid(data.results);
+            }
+        }
+
+        function refreshStream() {
+            const f = document.getElementById('v-frame');
+            const s = f.src; f.src = ''; 
+            setTimeout(() => { f.src = s; }, 100);
+        }
+    </script>
+</body>
+  </html>
